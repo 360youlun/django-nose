@@ -127,12 +127,23 @@ def _get_options():
                                metavar='NOSE_VERBOSITY',
                                **verbosity_attrs))
 
+    # copy nose's --verbose option and rename to --nose-verbose
+    verbose = [o for o in options if o.get_opt_string() == '--verbose'][0]
+    verbose_attrs = dict((attr, getattr(verbose, attr))
+                         for attr in verbose.ATTRS
+                         if attr not in ('dest', 'metavar'))
+    options.append(make_option('--nose-verbose',
+                               dest='nose_verbose',
+                               metavar='NOSE_VERBOSE',
+                               **verbose_attrs))
+
     # Django 1.6 introduces a "--pattern" option, which is shortened into "-p"
     # do not allow "-p" to collide with nose's "--plugins" option.
     plugins_option = [o for o in options if o.get_opt_string() == '--plugins'][0]
     plugins_option._short_opts.remove('-p')
 
     django_opts = [opt.dest for opt in BaseCommand.option_list] + ['version']
+
     return tuple(o for o in options if o.dest not in django_opts and
                                        o.action != 'help')
 
@@ -217,6 +228,14 @@ class BasicNoseRunner(DiscoverRunner):
             nose_argv.append('--verbosity=%s' % str(self.verbosity))
 
         if self.verbosity >= 1:
+            print(' '.join(nose_argv))
+
+        # if --nose-verbose was omitted, pass Django verbose to nose
+        if ('--verbose' not in nose_argv and
+                not any(opt.startswith('--verbose=') for opt in nose_argv)):
+            nose_argv.append('--verbose=%s' % str(self.verbose))
+
+        if self.verbose >= 1:
             print(' '.join(nose_argv))
 
         result = self.run_suite(nose_argv)
